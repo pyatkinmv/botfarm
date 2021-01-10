@@ -1,4 +1,4 @@
-package ru.pyatkinmv.impl;
+package ru.pyatkinmv.consume.impl;
 
 import com.vk.api.sdk.client.VkApiClient;
 import com.vk.api.sdk.client.actors.UserActor;
@@ -9,18 +9,31 @@ import com.vk.api.sdk.queries.wall.WallRepostQuery;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.val;
-import ru.pyatkinmv.api.ContentProvider;
+import ru.pyatkinmv.consume.api.PostConsumer;
+import ru.pyatkinmv.dto.WallPostDto;
+import ru.pyatkinmv.dto.PostReferenceDto;
 
 import java.io.File;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+
 
 @RequiredArgsConstructor
-public class ContentProviderImpl implements ContentProvider {
+public class PostConsumerImpl implements PostConsumer {
     private final VkApiClient vk;
     private final UserActor actor;
 
-    @SneakyThrows
     private WallPostQuery buildWallPhotoPostQuery(File file) {
+        Photo photo = uploadWallPhoto(file);
+        String attachments = String.format("photo%s_%s", photo.getOwnerId(), photo.getId());
+
+        return vk.wall()
+                .post(actor)
+                .attachments(attachments);
+    }
+
+    @SneakyThrows
+    private Photo uploadWallPhoto(File file) {
         val uploadUrl = vk.photos()
                 .getWallUploadServer(actor)
                 .execute()
@@ -36,27 +49,20 @@ public class ContentProviderImpl implements ContentProvider {
                 .hash(response.getHash())
                 .execute();
 
-        Photo photo = photos.get(0);
-
-        String attachments = String.format("photo%s_%s", photo.getOwnerId(), photo.getId());
-
-        return vk.wall()
-                .post(actor)
-                .attachments(attachments);
+        return photos.get(0);
     }
 
     @SneakyThrows
     @Override
-    public void postWallPhoto(File file) {
-        buildWallPhotoPostQuery(file).execute();
-    }
+    public void postWallPost(WallPostDto wallPost) {
+        WallPostQuery wallPostQuery = buildWallPhotoPostQuery(wallPost.getFile());
 
-    @SneakyThrows
-    @Override
-    public void postWallPhoto(File file, String message) {
-        buildWallPhotoPostQuery(file)
-                .message(message)
-                .execute();
+        if (isBlank(wallPost.getMessage())) {
+            wallPostQuery.execute();
+        } else {
+            wallPostQuery.message(wallPost.getMessage())
+                    .execute();
+        }
     }
 
     @SneakyThrows
@@ -91,22 +97,13 @@ public class ContentProviderImpl implements ContentProvider {
 
     @SneakyThrows
     @Override
-    public void repost(Integer ownerId, Integer postId) {
-        buildWallRepostQuery(ownerId, postId).execute();
-    }
-
-
-    @SneakyThrows
-    @Override
-    public void repost(Integer ownerId, Integer postId, String message) {
-        buildWallRepostQuery(ownerId, postId)
-                .message(message)
-                .execute();
+    public void repost(PostReferenceDto post) {
+        buildWallRepostQuery(post).execute();
     }
 
     // NOTE: If owner is a group than ownerId must be prefixed with minus.
-    private WallRepostQuery buildWallRepostQuery(Integer ownerId, Integer postId) {
+    private WallRepostQuery buildWallRepostQuery(PostReferenceDto post) {
         return vk.wall()
-                .repost(actor, String.format("wall%s_%s", ownerId, postId));
+                .repost(actor, String.format("wall%s_%s", post.getOwnerId(), post.getId()));
     }
 }

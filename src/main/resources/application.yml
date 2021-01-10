@@ -1,0 +1,18 @@
+server:
+  port: 7890
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: salesbox-mass
+  jpa:
+    open-in-view: false
+    hibernate:
+      naming:
+        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyComponentPathImpl
+  datasource:
+    url: jdbc:postgresql://dbpostgresql:5432/botfarm
+    username: postgres
+    password: password
+
