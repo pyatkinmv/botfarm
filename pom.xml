@@ -22,6 +22,9 @@
         <java.version>11</java.version>
         <commons-io.version>2.5</commons-io.version>
         <vk-sdk.version>0.5.12</vk-sdk.version>
+        <instagram4j.version>2.0.3</instagram4j.version>
+        <jasypt.version>2.0.0</jasypt.version>
+        <okhttp3.version>4.7.2</okhttp3.version>
     </properties>
 
     <dependencies>
@@ -33,11 +36,27 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.squareup.okhttp3</groupId>
+                    <artifactId>okhttp</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.squareup.okhttp3</groupId>
+                    <artifactId>okhttp</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!--        COMMON-->
@@ -60,6 +79,13 @@
             <groupId>com.vk.api</groupId>
             <artifactId>sdk</artifactId>
             <version>${vk-sdk.version}</version>
+        </dependency>
+
+        <!--        INST-->
+        <dependency>
+            <groupId>com.github.instagram4j</groupId>
+            <artifactId>instagram4j</artifactId>
+            <version>${instagram4j.version}</version>
         </dependency>
 
         <!--        DB-->

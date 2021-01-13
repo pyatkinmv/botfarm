@@ -1,13 +1,18 @@
 package ru.pyatkinmv.dao.entities;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import javax.persistence.*;
-import java.time.LocalDateTime;
 
 @Data
 @Entity
 @Table(name = "post")
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Post {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,6 +30,6 @@ public class Post {
     private PostType type;
 
     private String message;
-    private Boolean supplied;
-    private LocalDateTime sourceDate;
+    private Boolean isPosted;
+    private Long sourceDate;
 }

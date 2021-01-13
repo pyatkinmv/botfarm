@@ -5,14 +5,16 @@ server:
 
 spring:
   application:
-    name: salesbox-mass
+    name: botfarm
   jpa:
     open-in-view: false
     hibernate:
       naming:
         implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyComponentPathImpl
-  datasource:
-    url: jdbc:postgresql://dbpostgresql:5432/botfarm
-    username: postgres
-    password: password
 
+cron:
+  expression: "0 8 * * * *"
+
+instagram:
+  username: username
+  password: password
