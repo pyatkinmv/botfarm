@@ -23,4 +23,6 @@ public class Profile {
     private String token;
     private BigDecimal activityRate;
     private String reference;
+    @Enumerated(EnumType.STRING)
+    private ProfileType type;
 }

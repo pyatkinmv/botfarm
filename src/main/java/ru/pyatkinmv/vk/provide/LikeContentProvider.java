@@ -134,12 +134,15 @@ public class LikeContentProvider {
         NewsFeedPostGetQuery newsFeedPostGetQuery = GSON.fromJson(
                 vk.newsfeed()
                         .get(actor)
+                        // NOTE: For some reason can not like audio post
                         .filters(NewsfeedGetFilter.WALL_PHOTO, NewsfeedGetFilter.PHOTO)
                         .count(MAX_COUNT)
                         .executeAsString(),
                 NewsFeedPostGetQuery.class);
 
-        return newsFeedPostGetQuery.getResponse().getItems().stream()
+        return newsFeedPostGetQuery.getResponse()
+                .getItems()
+                .stream()
                 .filter(it -> it.getLikes() != null && isNotLiked(it.getLikes()))
                 .map(LikeContentProvider::convert)
                 .filter(it -> isUser(it.getOwnerId()))

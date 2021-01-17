@@ -1,19 +1,16 @@
 package ru.pyatkinmv.task;
 
-import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import ru.pyatkinmv.dao.ProfileRepository;
 import ru.pyatkinmv.dao.entities.Profile;
-import ru.pyatkinmv.service.LikeService;
-import ru.pyatkinmv.service.PostService;
-import ru.pyatkinmv.service.SubscribeService;
+import ru.pyatkinmv.service.*;
 
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -21,47 +18,55 @@ import java.util.stream.IntStream;
 
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
+import static ru.pyatkinmv.service.MethodInfo.*;
 
 @Component
 @Slf4j
 public class TaskGenerator {
-    private static final long ACTIVITY_PERIOD_MILLIS = (long) 16 * 60 * 60 * 1000;
+    private static final long DEFAULT_DURATION_MILLIS = (long) 16 * 60 * 60 * 1000;
 
     private final ProfileRepository profileRepository;
-    private final List<MethodInfo> profileConsumerToRateMap;
+    private final ProfileMethodsProvider profileMethodsProvider;
+    private final Map<MethodInfo, Consumer<Profile>> infoToMethodMap;
 
-    public TaskGenerator(LikeService likeService, SubscribeService subscribeService, PostService postService, ProfileRepository profileRepository) {
+    public TaskGenerator(LikeService likeService,
+                         SubscribeService subscribeService,
+                         PostService postService,
+                         ProfileRepository profileRepository,
+                         ProfileMethodsProvider profileMethodsProvider) {
         this.profileRepository = profileRepository;
-        this.profileConsumerToRateMap = List.of(
-                new MethodInfo("LIKE_PHOTO", likeService::likePhoto, BigDecimal.valueOf(20.0)),
-                new MethodInfo("LIKE_POST", likeService::likePost, BigDecimal.valueOf(20.0)),
-                new MethodInfo("SUBSCRIBE_ON_USER", subscribeService::subscribeOnUser, BigDecimal.valueOf(50.0)),
-                new MethodInfo("SUBSCRIBE_ON_GROUP", subscribeService::subscribeOnGroup, BigDecimal.valueOf(0.01)),
-                new MethodInfo("POST_MAIN_PHOTO", postService::postMainPhoto, BigDecimal.valueOf(0.04)),
-                new MethodInfo("POST_WALL_POST", postService::postWallPost, BigDecimal.valueOf(0.3)),
-                new MethodInfo("REPOST", postService::repost, BigDecimal.valueOf(0.5))
+        this.profileMethodsProvider = profileMethodsProvider;
+        this.infoToMethodMap = Map.of(
+                LIKE_PHOTO, likeService::likePhoto,
+                LIKE_POST, likeService::likePost,
+                SUBSCRIBE_ON_USER, subscribeService::subscribeOnUser,
+                SUBSCRIBE_ON_GROUP, subscribeService::subscribeOnGroup,
+                POST_MAIN_PHOTO, postService::postMainPhoto,
+                POST_WALL_PHOTO, postService::postWallPhotoPost,
+                REPOST, postService::repost
         );
     }
 
-    @Data
-    @RequiredArgsConstructor
-    private static class MethodInfo {
-        private final String methodName;
-        private final Consumer<Profile> method;
-        private final BigDecimal rate;
+    public Collection<Task> generate(Integer userId, Long durationMillis) {
+        return profileRepository.findByUserId(userId)
+                .map(it -> generate(it, durationMillis))
+                .orElseThrow();
     }
 
     public Map<Profile, Collection<Task>> generate() {
         return profileRepository.findAll()
                 .stream()
-                .collect(toMap(Function.identity(), this::generate));
+                .collect(toMap(Function.identity(), it -> generate(it, DEFAULT_DURATION_MILLIS)));
     }
 
-    private Collection<Task> generate(Profile profile) {
+    private Collection<Task> generate(Profile profile, Long durationMillis) {
         log.info("Generating tasks for user {}", profile.getUserId());
-        List<Task> tasks = profileConsumerToRateMap.stream()
-                .map(it -> Map.entry(it, count(it.getRate().multiply(profile.getActivityRate()))))
-                .map(it -> distribute(it.getKey(), profile, it.getValue()))
+        Set<MethodInfo> availableMethods = profileMethodsProvider.getMethods(profile.getType());
+
+        List<Task> tasks = infoToMethodMap.entrySet()
+                .stream()
+                .filter(it -> availableMethods.contains(it.getKey()))
+                .map(it -> generate(it.getKey(), it.getValue(), profile, durationMillis))
                 .flatMap(Collection::stream)
                 .collect(toList());
         log.info("Generated {} tasks for user {}", tasks.size(), profile.getUserId());
@@ -74,10 +79,10 @@ public class TaskGenerator {
         BigDecimal fractionalPart = rate.subtract(BigDecimal.valueOf(integerPart));
 
         if (!fractionalPart.equals(BigDecimal.ZERO)) {
-            int multiplier = 100;
+            int multiplier = 1000;
             int probability = fractionalPart.multiply(BigDecimal.valueOf(multiplier)).intValue();
 
-            int randomInt = ThreadLocalRandom.current().nextInt(100);
+            int randomInt = ThreadLocalRandom.current().nextInt(1000);
 
             if (randomInt <= probability) {
                 integerPart++;
@@ -87,22 +92,27 @@ public class TaskGenerator {
         return integerPart;
     }
 
-    private Collection<Task> distribute(MethodInfo methodInfo, Profile profile, int count) {
+    private Collection<Task> generate(MethodInfo methodInfo,
+                                      Consumer<Profile> method,
+                                      Profile profile,
+                                      Long durationMillis) {
+        int count = count(methodInfo.getRate().multiply(profile.getActivityRate()));
+
         long now = System.currentTimeMillis();
 
         return IntStream.rangeClosed(0, count)
                 .mapToObj(
                         it -> Task.builder()
-                                .runnable(() -> methodInfo.getMethod().accept(profile))
-                                .date(randomDateBetween(now, now + ACTIVITY_PERIOD_MILLIS))
-                                .methodName(methodInfo.getMethodName())
+                                .runnable(() -> method.accept(profile))
+                                .date(randomDateBetween(now, now + durationMillis))
+                                .methodName(methodInfo.name())
                                 .userId(profile.getUserId())
                                 .build()
                 )
                 .collect(toList());
     }
 
-    private long randomDateBetween(long beginDate, long endDate) {
+    private static long randomDateBetween(long beginDate, long endDate) {
         return ThreadLocalRandom.current().nextLong(endDate - beginDate) + beginDate;
     }
 }

@@ -9,11 +9,13 @@ import ru.pyatkinmv.dao.FileRepository;
 import ru.pyatkinmv.dao.PostRepository;
 import ru.pyatkinmv.dao.entities.FileInfo;
 import ru.pyatkinmv.dao.entities.Post;
-import ru.pyatkinmv.dao.entities.PostType;
 import ru.pyatkinmv.exception.ItemNotFoundException;
 import ru.pyatkinmv.vk.dto.WallPostDto;
 
 import java.io.File;
+import java.util.Collection;
+
+import static java.util.stream.Collectors.toList;
 
 @Component
 @RequiredArgsConstructor
@@ -22,7 +24,7 @@ public class PostContentProvider {
     private final FileRepository fileRepository;
 
     @SneakyThrows
-    private File convert(FileInfo file) {
+    private File toFile(FileInfo file) {
         File destination = new File(file.getName());
         final byte[] fileData = fileRepository.getFileData(file.getId());
         FileUtils.writeByteArrayToFile(destination, fileData);
@@ -32,25 +34,27 @@ public class PostContentProvider {
 
     @SneakyThrows
     @Transactional
-    public WallPostDto getWallPost(Integer profileId) {
-        Post post = postRepository.findByProfileIdAndType(profileId, PostType.WALL.name())
+    public WallPostDto getWallPhotoPost(Integer profileId) {
+        Post post = postRepository.findOldestNotPostedById(profileId)
                 .orElseThrow(ItemNotFoundException::new);
 
-        post.setIsPosted(true);
+        post.setPosted(true);
         postRepository.save(post);
 
-        return new WallPostDto(
-                post.getMessage(),
-                convert(post.getFile())
-        );
+        Collection<File> images = post.getImages()
+                .stream()
+                .map(this::toFile)
+                .collect(toList());
+
+        return new WallPostDto(images, post.getMessage());
     }
 
     @Transactional
     public String getWallMessage(Integer profileId) {
-        final Post post = postRepository.findByProfileIdAndType(profileId, PostType.WALL_MESSAGE.name())
+        Post post = postRepository.findOldestNotPostedById(profileId)
                 .orElseThrow(ItemNotFoundException::new);
 
-        post.setIsPosted(true);
+        post.setPosted(true);
         postRepository.save(post);
 
         return post.getMessage();
@@ -58,12 +62,15 @@ public class PostContentProvider {
 
     @Transactional
     public File getMainPhoto(Integer profileId) {
-        Post post = postRepository.findByProfileIdAndType(profileId, PostType.MAIN_PHOTO.name())
+        Post post = postRepository.findMostLikedNotPostedById(profileId)
                 .orElseThrow(ItemNotFoundException::new);
 
-        post.setIsPosted(true);
+        post.setPosted(true);
         postRepository.save(post);
 
-        return convert(post.getFile());
+        return post.getImages()
+                .stream().findFirst()
+                .map(this::toFile)
+                .orElseThrow();
     }
 }

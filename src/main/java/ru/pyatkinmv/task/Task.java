@@ -11,7 +11,7 @@ import java.util.concurrent.ThreadLocalRandom;
 @Builder
 @Slf4j
 public class Task implements Runnable {
-    private final Integer id = ThreadLocalRandom.current().nextInt();
+    private final Integer id = ThreadLocalRandom.current().nextInt(Integer.MAX_VALUE);
     private final Runnable runnable;
     private final String methodName;
     private final Integer userId;

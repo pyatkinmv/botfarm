@@ -18,4 +18,7 @@ public class FileInfo {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     private String name;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "post_id", nullable = false)
+    private Post post;
 }

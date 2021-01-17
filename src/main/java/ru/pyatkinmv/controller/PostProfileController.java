@@ -14,7 +14,7 @@ public class PostProfileController {
     private final PostProfileService postProfileService;
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    @ResponseStatus(code = HttpStatus.NO_CONTENT)
+    @ResponseStatus(code = HttpStatus.OK)
     public void post(@RequestBody ProfileDto profile) {
         postProfileService.post(profile);
     }

@@ -9,13 +9,12 @@ import com.github.instagram4j.instagram4j.responses.feed.FeedUserResponse;
 import lombok.SneakyThrows;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import ru.pyatkinmv.inst.dto.ImageInfo;
+import ru.pyatkinmv.inst.dto.PostInfo;
 
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 
 @Component
 public class ImageProvider {
@@ -25,7 +24,7 @@ public class ImageProvider {
     private String clientPassword;
 
     @SneakyThrows
-    public Collection<ImageInfo> getImages(String username) {
+    public Collection<PostInfo> getImages(String username) {
         IGClient client = IGClient.builder()
                 .username(clientUsername)
                 .password(clientPassword)
@@ -40,7 +39,7 @@ public class ImageProvider {
     }
 
     @SneakyThrows
-    private static List<ImageInfo> getImages(IGClient client, Long pk) {
+    private static List<PostInfo> getImages(IGClient client, Long pk) {
         String maxId = "";
         List<TimelineMedia> items = new ArrayList<>();
 
@@ -51,56 +50,58 @@ public class ImageProvider {
         }
 
         return items.stream()
-                .flatMap(it -> mediaToImages(it).stream())
-                .collect(Collectors.toList());
+                .map(ImageProvider::mediaToPost)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(toList());
     }
 
-    private static List<ImageInfo> mediaToImages(TimelineMedia media) {
-        if (media.getUsertags() != null) {
-            return Collections.emptyList();
-        }
-
+    private static Optional<PostInfo> mediaToPost(TimelineMedia media) {
         if (media instanceof TimelineImageMedia) {
-            TimelineImageMedia imageMedia = (TimelineImageMedia) media;
+            TimelineImageMedia postMedia = (TimelineImageMedia) media;
 
-            ImageVersionsMeta imageVersionsMeta = selectLargest(
-                    imageMedia.getImage_versions2().getCandidates()
+            ImageVersionsMeta image = selectLargest(
+                    postMedia.getImage_versions2().getCandidates()
             );
 
-            return singletonList(toImage(imageVersionsMeta, imageMedia));
+            return Optional.of(toPostInfo(List.of(image), postMedia));
 
         } else if (media instanceof TimelineCarouselMedia) {
-            TimelineCarouselMedia carouselMedia = (TimelineCarouselMedia) media;
+            TimelineCarouselMedia postMedia = (TimelineCarouselMedia) media;
 
-            return carouselMedia.getCarousel_media()
+            Collection<ImageVersionsMeta> postImages = postMedia.getCarousel_media()
                     .stream()
                     .filter(it -> it instanceof ImageCaraouselItem)
                     .map(it -> (ImageCaraouselItem) it)
                     .map(it -> selectLargest(it.getImage_versions2().getCandidates()))
-                    .map(it -> toImage(it, carouselMedia))
-                    .collect(Collectors.toList());
+                    .collect(toList());
+
+            return Optional.of(toPostInfo(postImages, postMedia));
         }
 
-        return Collections.emptyList();
+        return Optional.empty();
     }
 
-    private static ImageInfo toImage(ImageVersionsMeta imageVersionsMeta, TimelineMedia media) {
-        ImageInfo imageInfo = ImageInfo.builder()
-                .url(imageVersionsMeta.getUrl())
-                .name(urlToName(imageVersionsMeta.getUrl()))
-                .likesCount(media.getLike_count())
+    private static PostInfo toPostInfo(Collection<ImageVersionsMeta> images, TimelineMedia post) {
+        return PostInfo.builder()
+                .images(
+                        images.stream()
+                                .map(
+                                        it -> PostInfo.ImageInfo.builder()
+                                                .url(it.getUrl())
+                                                .name(urlToName(it.getUrl()))
+                                                .build()
+                                )
+                                .collect(toList())
+                )
+                .likesCount(post.getLike_count())
+                .createdTime(post.getTaken_at() * 1000L)
+                .message(
+                        Optional.ofNullable(post.getCaption())
+                                .map(Comment::getText)
+                                .orElse(null)
+                )
                 .build();
-
-        Comment.Caption caption = media.getCaption();
-
-        if (caption != null) {
-            imageInfo.setDate(caption.getCreated_at() * 1000);
-            imageInfo.setMessage(caption.getText());
-        } else {
-            imageInfo.setDate(new Date().getTime());
-        }
-
-        return imageInfo;
     }
 
     private static String urlToName(String url) {

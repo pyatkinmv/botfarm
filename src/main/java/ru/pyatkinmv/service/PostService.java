@@ -32,10 +32,10 @@ public class PostService {
         );
     }
 
-    public void postWallPost(Profile profile) {
-        poster.postWallPost(
+    public void postWallPhotoPost(Profile profile) {
+        poster.postWallPhotoPost(
                 new UserActor(profile.getUserId(), profile.getToken()),
-                postContentProvider.getWallPost(profile.getId())
+                postContentProvider.getWallPhotoPost(profile.getId())
         );
     }
 

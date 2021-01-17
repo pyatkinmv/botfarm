@@ -15,21 +15,10 @@ import ru.pyatkinmv.vk.dto.WallPostDto;
 
 import java.io.File;
 
-import static org.apache.commons.lang3.StringUtils.isBlank;
-
 @Component
 @RequiredArgsConstructor
 public class Poster {
     private final VkApiClient vk;
-
-    private WallPostQuery buildWallPhotoPostQuery(UserActor actor, File file) {
-        Photo photo = uploadWallPhoto(actor, file);
-        String attachments = String.format("photo%s_%s", photo.getOwnerId(), photo.getId());
-
-        return vk.wall()
-                .post(actor)
-                .attachments(attachments);
-    }
 
     @SneakyThrows
     private Photo uploadWallPhoto(UserActor actor, File file) {
@@ -52,16 +41,24 @@ public class Poster {
     }
 
     @SneakyThrows
-    public void postWallPost(UserActor actor, WallPostDto wallPost) {
-        WallPostQuery wallPostQuery = buildWallPhotoPostQuery(actor, wallPost.getFile());
+    public void postWallPhotoPost(UserActor actor, WallPostDto wallPost) {
+        String[] attachments = wallPost.getImages()
+                .stream()
+                .map(it -> uploadWallPhoto(actor, it))
+                .map(it -> String.format("photo%s_%s", it.getOwnerId(), it.getId()))
+                .toArray(String[]::new);
 
-        if (isBlank(wallPost.getMessage())) {
-            wallPostQuery.execute();
-        } else {
-            wallPostQuery.message(wallPost.getMessage())
-                    .execute();
+        WallPostQuery postQuery = vk.wall()
+                .post(actor)
+                .attachments(attachments);
+
+        if (wallPost.getMessage() != null) {
+            postQuery = postQuery.message(wallPost.getMessage());
         }
+
+        postQuery.execute();
     }
+
 
     @SneakyThrows
     public void postWallMessage(UserActor actor, String message) {

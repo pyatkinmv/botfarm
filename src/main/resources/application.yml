@@ -13,7 +13,7 @@ spring:
         implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyComponentPathImpl
 
 cron:
-  expression: "0 8 * * * *"
+  expression: "0 0 7 * * *"
 
 instagram:
   username: username

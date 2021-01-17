@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import javax.persistence.*;
+import java.util.List;
 
 @Data
 @Entity
@@ -22,14 +23,11 @@ public class Post {
     @JoinColumn(name = "profile_id", referencedColumnName = "id")
     private Profile profile;
 
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "file_id", referencedColumnName = "id")
-    private FileInfo file;
-
-    @Enumerated(EnumType.STRING)
-    private PostType type;
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<FileInfo> images;
 
     private String message;
-    private Boolean isPosted;
+    private Boolean posted;
     private Long sourceDate;
+    private Integer likesCount;
 }
