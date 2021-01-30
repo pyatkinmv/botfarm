@@ -1,5 +1,6 @@
-package ru.pyatkinmv.task;
+package ru.pyatkinmv.service.task;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Builder;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -12,10 +13,11 @@ import java.util.concurrent.ThreadLocalRandom;
 @Slf4j
 public class Task implements Runnable {
     private final Integer id = ThreadLocalRandom.current().nextInt(Integer.MAX_VALUE);
+    @JsonIgnore
     private final Runnable runnable;
     private final String methodName;
     private final Integer userId;
-    private final Long date;
+    private final Date date;
 
     @Override
     public void run() {
@@ -28,7 +30,7 @@ public class Task implements Runnable {
         return "Task(id=" + this.getId()
                 + ", methodName=" + this.getMethodName()
                 + ", userId=" + this.getUserId()
-                + ", date=" + new Date(this.getDate())
+                + ", date=" + this.getDate()
                 + ")";
     }
 }

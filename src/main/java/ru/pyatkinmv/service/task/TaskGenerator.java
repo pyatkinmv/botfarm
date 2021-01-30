@@ -1,4 +1,4 @@
-package ru.pyatkinmv.task;
+package ru.pyatkinmv.service.task;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -7,10 +7,7 @@ import ru.pyatkinmv.dao.entities.Profile;
 import ru.pyatkinmv.service.*;
 
 import java.math.BigDecimal;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -104,7 +101,7 @@ public class TaskGenerator {
                 .mapToObj(
                         it -> Task.builder()
                                 .runnable(() -> method.accept(profile))
-                                .date(randomDateBetween(now, now + durationMillis))
+                                .date(new Date(randomDateBetween(now, now + durationMillis)))
                                 .methodName(methodInfo.name())
                                 .userId(profile.getUserId())
                                 .build()

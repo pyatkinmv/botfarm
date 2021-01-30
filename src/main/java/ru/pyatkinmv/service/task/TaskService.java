@@ -1,20 +1,21 @@
-package ru.pyatkinmv.service;
+package ru.pyatkinmv.service.task;
 
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import ru.pyatkinmv.task.Task;
-import ru.pyatkinmv.task.TaskGenerator;
+import org.springframework.util.ReflectionUtils;
 
+import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
+import static java.util.Comparator.comparing;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 @Component
@@ -35,6 +36,7 @@ public class TaskService {
     }
 
     public void plan(Integer userId, Long durationMillis) {
+        // TODO: enable planning only if there is no tasks already in queue
         if (durationMillis < 60 * 1000) {
             throw new IllegalArgumentException("Duration should be at least one minute");
         }
@@ -44,44 +46,42 @@ public class TaskService {
     }
 
     public TaskQueueDto getTaskQueue() {
-        return new TaskQueueDto(
-                taskExecutor.getQueue()
-                        .stream()
-                        .map(it -> extractTaskData(it.toString()))
-                        .collect(toList())
-        );
+        return new TaskQueueDto(getTasks());
     }
 
-    // NOTE: BICYCLE. Don't know how to extract data from queue in a better way
-    private String extractTaskData(String taskString) {
-        Matcher statusMatcher = Pattern.compile("\\[(.*?), task").matcher(taskString);
-        if (!statusMatcher.find()) {
-            throw new IllegalStateException("Can not extract task status from string");
-        }
+    private Collection<Task> getTasks() {
+        return taskExecutor.getQueue()
+                .stream()
+                .map(this::extractTask)
+                .sorted(comparing(Task::getDate))
+                .collect(toList());
+    }
 
-        String rawStatus = statusMatcher.group();
-        String status = rawStatus.substring(1, rawStatus.length() - 6);
+    // NOTE:  Don't know how to extract task from queue in a better way
+    @SneakyThrows
+    private Task extractTask(Object scheduledTask) {
+        Field callableField = requireNonNull(ReflectionUtils.findField(FutureTask.class, "callable"));
 
-        Matcher taskMatcher = Pattern.compile("Task\\((.*?)\\)").matcher(taskString);
-        if (!taskMatcher.find()) {
-            throw new IllegalStateException("Can not extract task data from string");
-        }
-        String task = taskMatcher.group();
+        ReflectionUtils.makeAccessible(callableField);
+        Object callable = callableField.get(scheduledTask);
 
-        return String.format("status = %s, task = %s", status, task);
+        Field taskField = requireNonNull(ReflectionUtils.findField(callable.getClass(), "task"));
+        ReflectionUtils.makeAccessible(taskField);
+
+        return (Task) taskField.get(callable);
     }
 
     public TaskQueueDto getTaskQueue(Integer userId) {
         return new TaskQueueDto(
-                getTaskQueue().getQueue()
-                        .stream()
-                        .filter(it -> it.contains(String.valueOf(userId)))
+                getTasks().stream()
+                        .filter(it -> it.getUserId().equals(userId))
                         .collect(toList())
         );
     }
 
+
     private void plan(Task task) {
-        taskExecutor.schedule(task, millisToDate(task.getDate()), TimeUnit.MILLISECONDS);
+        taskExecutor.schedule(task, millisToDate(task.getDate().getTime()), TimeUnit.MILLISECONDS);
     }
 
     private static Long millisToDate(Long date) {
@@ -91,9 +91,9 @@ public class TaskService {
     @Data
     public static class TaskQueueDto {
         private int size;
-        private Collection<String> queue;
+        private Collection<Task> queue;
 
-        public TaskQueueDto(Collection<String> queue) {
+        public TaskQueueDto(Collection<Task> queue) {
             this.size = queue.size();
             this.queue = queue;
         }
